@@ -93,6 +93,7 @@ def add_exchange_reactions(model, template):
             model.add_reaction(reaction.copy())
     return model
 
+    
 def homology_gapfilling(model, templates, model_obj = None, template_obj = None, use_all_templates = False,
                        integer_threshold = 1e-6, force_exchange = False):
     """
@@ -113,27 +114,32 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
             if force_exchange == True:
                 add_exchange_reactions(model, template)
             template.solver = 'gurobi'
-            # result variable will store the reactions ids
-            result = gapfilling(model, template, integer_threshold = integer_threshold)
-            # reactions "log"
-            log = []
-            for reaction in result[0]:
-                if reaction.id.startswith("EX_"):
-                    log.append((reaction.id, "Exchange reaction"))
-                else:
-                    log.append((reaction.id, [str(list(reaction.genes)[i]) 
+            try:
+                # result variable will store the reactions ids
+                result = gapfilling(model, template, integer_threshold = integer_threshold)
+                # reactions "log"
+                log = []
+                for reaction in result[0]:
+                    if reaction.id.startswith("EX_"):
+                        log.append((reaction.id, "Exchange reaction"))
+                    else:
+                        log.append((reaction.id, [str(list(reaction.genes)[i]) 
                                               for i in range(len(list(reaction.genes)))]))
-            added_reactions[str(template)] = log
-            # Adding reactions to the model
-            [model.add_reaction(reaction.copy()) for reaction in result[0]]
-            # Flux will be evaluated here
-            new_value = model.optimize().objective_value
-            if new_value != None and new_value > value:
-                value = new_value
-            elif new_value == None:
-                continue
-            elif new_value != None and new_value == value:
-                break
+                added_reactions[str(template)] = log
+                # Adding reactions to the model
+                [model.add_reaction(reaction.copy()) for reaction in result[0]]
+                # Flux will be evaluated here
+                new_value = model.optimize().objective_value
+                if new_value != None and new_value > value:
+                    value = new_value
+                elif new_value == None:
+                    continue
+                elif new_value != None and new_value == value:
+                    break
+            except RuntimeError:
+                print("\n" + str(template) + ": failed to validate gapfilled model, try lowering the integer_threshold")
+            except exceptions.Infeasible:
+                print("\n" + str(template) + ": gapfilling optimization failed (infeasible)")
         return model, added_reactions
     else:
         for template in templates:
@@ -141,14 +147,19 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
             if force_exchange == True:
                 add_exchange_reactions(model, template)
             template.solver = 'gurobi'
-            result = gapfilling(model, template, integer_threshold = integer_threshold)
-            log = []
-            for reaction in result[0]:
-                if reaction.id.startswith("EX_"):
-                    log.append((reaction.id, "Exchange reaction"))
-                else:
-                    log.append((reaction.id, [str(list(reaction.genes)[i]) 
+            try:
+                result = gapfilling(model, template, integer_threshold = integer_threshold)
+                log = []
+                for reaction in result[0]:
+                    if reaction.id.startswith("EX_"):
+                        log.append((reaction.id, "Exchange reaction"))
+                    else:
+                        log.append((reaction.id, [str(list(reaction.genes)[i]) 
                                               for i in range(len(list(reaction.genes)))]))
-            added_reactions[str(template)] = log
-            [model.add_reaction(reaction.copy()) for reaction in result[0]]
-        return model, added_reaction
+                added_reactions[str(template)] = log
+                [model.add_reaction(reaction.copy()) for reaction in result[0]]
+            except RuntimeError:
+                print("\n" + str(template) + ": failed to validate gapfilled model, try lowering the integer_threshold")
+            except exceptions.Infeasible:
+                print("\n" + str(template) + ": gapfilling optimization failed (infeasible)") 
+        return model, added_reactions
