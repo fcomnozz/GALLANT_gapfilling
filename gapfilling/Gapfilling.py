@@ -2,6 +2,7 @@ import cobra
 import re
 from cobra.flux_analysis.gapfilling import GapFiller
 import gurobipy
+from cobra import exceptions
 
 def load_query_model(model, obj = None):
     """
@@ -91,6 +92,74 @@ def add_exchange_reactions(model, template):
     for reaction in EX:
         if reaction not in model.reactions and str(list(reaction.metabolites.keys())[0]) in [i.id for i in model.metabolites]:
             model.add_reaction(reaction.copy())
+    return model
+
+def is_transport(reaction, compartments_list):
+    """
+    Takes a cobra model reaction as input and determines if it is a transport reaction.
+    """
+    # left part of the reaction
+    r = list(str(x) for x in reaction.reactants)
+    # right part
+    p = list(str(x) for x in reaction.products)
+    if len(r) != len(p):
+        return False
+    c = compartments_list
+    # removing terminations
+    R = []
+    for i in r:
+        for e in c:
+            i = i.replace(e, "") 
+        R.append(i)
+    P = []
+    for i in p:
+        for e in c:
+            i = i.replace(e, "")
+        P.append(i)
+    # we sort the lists to avoid missing transport reactions where the sequence of the compounds is not maintained
+    R = sorted(R)
+    P = sorted(P)
+    if R == P:
+        return True
+    else:
+        return False
+    
+def add_transport(model, template):
+    """
+    Adds transport reactions from a template which metabolites are present in the model.
+    """
+    # PREPARATION
+    # template compartments
+    t_compartments = list(template.compartments.keys())
+    t_Compartments = []
+    for i in t_compartments:
+        t_Compartments.append("_" + str(i))
+    # getting compartments and metabolites from query model for further use
+    m_compartments = list(model.compartments.keys())
+    m_Compartments = []
+    for i in m_compartments:
+        m_Compartments.append("_" + str(i))
+    m_metabolites = list(str(x) for x in model.metabolites)
+    # removing suffixes from metabolites
+    m_Metabolites = []
+    for i in m_metabolites:
+        for e in m_Compartments:
+            i = i.replace(e, "")
+        m_Metabolites.append(i)
+    # sorting and removing duplicates
+    m_Metabolites = list(dict.fromkeys(m_Metabolites))
+    # REACTION ADDING
+    for reaction in template.reactions:
+        if is_transport(reaction, t_Compartments) and reaction not in model.reactions:
+            # we will only use reactants as they'll be the same as products (apart from location)
+            m = list(str(x) for x in reaction.reactants)
+            M = []
+            for i in m:
+                for e in t_Compartments:
+                    i = i.replace(e, "")
+                M.append(i)
+            if all(x in m_Metabolites for x in M):  
+                model.add_reaction(reaction.copy())
     return model
 
     
