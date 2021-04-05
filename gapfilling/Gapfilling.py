@@ -94,9 +94,12 @@ def add_exchange_reactions(model, template):
             model.add_reaction(reaction.copy())
     return model
 
-def is_transport(reaction, compartments_list):
+def is_transport(reaction, compartments_list, all_compounds = False, ignore_H = False):
     """
     Takes a cobra model reaction as input and determines if it is a transport reaction.
+    all_compounds = True -> both sides of the reaction must be the same
+    all_compounds = False -> at least one compound must be in both sides
+    ignore_h = True -> does not consider proton transference as transport
     """
     # left part of the reaction
     r = list(str(x) for x in reaction.reactants)
@@ -119,6 +122,17 @@ def is_transport(reaction, compartments_list):
     # we sort the lists to avoid missing transport reactions where the sequence of the compounds is not maintained
     R = sorted(R)
     P = sorted(P)
+    if all_compounds == False:
+        if ignore_h == True:
+            if "h" in R:
+                R.remove("h")
+            if "h" in P:
+                P.remove("h")
+        for i in R:
+            if i in P:
+                return True
+            else:
+                return False
     if R == P:
         return True
     else:
@@ -162,9 +176,8 @@ def add_transport(model, template):
                 model.add_reaction(reaction.copy())
     return model
 
-    
 def homology_gapfilling(model, templates, model_obj = None, template_obj = None, use_all_templates = False,
-                       integer_threshold = 1e-6, force_exchange = False):
+                       integer_threshold = 1e-6, force_exchange = False, add_transport = False):
     """
     Performs gap filling on a model using homology models as templates.
     """
@@ -182,6 +195,9 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
             # adding exchange reactions
             if force_exchange == True:
                 add_exchange_reactions(model, template)
+            # adding transport reactions
+            if add_transport == True:
+                add_transport(model, template)
             template.solver = 'gurobi'
             try:
                 # result variable will store the reactions ids
@@ -215,6 +231,9 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
             # adding exchange reactions
             if force_exchange == True:
                 add_exchange_reactions(model, template)
+            # adding transport reactions
+            if add_transport == True:
+                add_transport(model, template)
             template.solver = 'gurobi'
             try:
                 result = gapfilling(model, template, integer_threshold = integer_threshold)
