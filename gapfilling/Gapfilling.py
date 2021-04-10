@@ -177,7 +177,7 @@ def add_transport(model, template, all_compounds = False, ignore_h = False):
     return model
 
 def homology_gapfilling(model, templates, model_obj = None, template_obj = None, use_all_templates = False,
-                       integer_threshold = 1e-6, force_exchange = False, add_transport = False, t_all_compounds = False,
+                       integer_threshold = 1e-6, force_exchange = False, force_transport = False, t_all_compounds = False,
                        t_ignore_h = False):
     """
     Performs gap filling on a model using homology models as templates.
@@ -197,7 +197,7 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
             if force_exchange == True:
                 add_exchange_reactions(model, template)
             # adding transport reactions
-            if add_transport == True:
+            if force_transport == True:
                 add_transport(model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
             template.solver = 'gurobi'
             try:
@@ -233,7 +233,7 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
             if force_exchange == True:
                 add_exchange_reactions(model, template)
             # adding transport reactions
-            if add_transport == True:
+            if force_transport == True:
                 add_transport(model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
             template.solver = 'gurobi'
             try:
