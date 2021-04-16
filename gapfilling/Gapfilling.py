@@ -3,6 +3,13 @@ import re
 from cobra.flux_analysis.gapfilling import GapFiller
 import gurobipy
 from cobra import exceptions
+import os, sys
+
+def fake_copy(model):
+    write_sbml_model(model, filename = "tmp.xml")
+    copied_model = read_sbml_model("tmp.xml")
+    os.remove("tmp.xml")
+    return copied_model
 
 def load_query_model(model, obj = None):
     """
@@ -11,39 +18,41 @@ def load_query_model(model, obj = None):
     Print is used temporary. A general log will be generated in the 
     final version.
     """
-    model = model
+    Model = fake_copy(model)
     if obj == "biomass":
         b = re.compile("biomass", re.IGNORECASE)
         bc = re.compile("(biomass){1}.*(core){1}", re.IGNORECASE)
-        reactions = [reaction.id for reaction in model.reactions]
+        reactions = [reaction.id for reaction in Model.reactions]
         # searching for a biomass core reaction
         core = list(filter(bc.match, reactions))
         if core:
-            model.objective = core[0]
-            return model
+            Model.objective = core[0]
+            return Model
         # searching for a non core biomass reaction
         biomass = list(filter(b.match, reactions))
         if biomass:
-            model.objective = biomass[0]
-            return model
+            Model.objective = biomass[0]
+            return Model
         print("biomass not found in the query model")
-        return model
+        return Model
     if obj != "biomass" and obj != None:
         try:
-            model.objective = obj
+            Model.objective = obj
         except ValueError:
             print(str(obj) + " not found in the query model")
-            return model
-        return model
+            return Model
+        return Model
     if obj == None:
-        return model
+        return Model
 
 def load_template_models(template_list, obj = None):
     """
     Takes a list of template models and changes objective if specified.
     Objective can be either "biomass" or a specific reaction ID.
     """
-    templates = template_list
+    templates = []
+    for t in template_list:
+        templates.append(fake_copy(t))
     failures = []
     if obj == None:
         return templates
@@ -178,33 +187,33 @@ def add_transport(model, template, all_compounds = False, ignore_h = False):
 
 def homology_gapfilling(model, templates, model_obj = None, template_obj = None, use_all_templates = False,
                        integer_threshold = 1e-6, force_exchange = False, force_transport = False, t_all_compounds = False,
-                       t_ignore_h = False):
+                       t_ignore_h = False, value_fraction = 0.8):
     """
     Performs gap filling on a model using homology models as templates.
     """
-    model = load_query_model(model, obj = model_obj)
-    model.solver = 'gurobi'
-    templates = load_template_models(templates, obj = template_obj)
+    Model = load_query_model(model, obj = model_obj)
+    Model.solver = 'gurobi'
+    Templates = load_template_models(templates, obj = template_obj)
     # this dict will store used models, genes and reactions
     added_reactions = {}
     # initial flux value
-    value = model.optimize().objective_value
+    value = Model.optimize().objective_value
     if value == None:
         value = 0.0
     if use_all_templates == False:
-        for template in templates:
+        for template in Templates:
             # adding exchange reactions
             if force_exchange == True:
-                add_exchange_reactions(model, template)
+                add_exchange_reactions(Model, template)
             # adding transport reactions
             if force_transport == True:
-                add_transport(model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
+                add_transport(Model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
             template.solver = 'gurobi'
             try:
-                # result variable will store the reactions ids
-                result = gapfilling(model, template, integer_threshold = integer_threshold)
                 # reactions "log"
                 log = []
+                # result variable will store the reactions ids
+                result = gapfilling(Model, template, integer_threshold = integer_threshold)
                 for reaction in result[0]:
                     if reaction.id.startswith("EX_"):
                         log.append((reaction.id, "Exchange reaction"))
@@ -213,32 +222,43 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
                                               for i in range(len(list(reaction.genes)))]))
                 added_reactions[str(template)] = log
                 # Adding reactions to the model
-                [model.add_reaction(reaction.copy()) for reaction in result[0]]
+                [Model.add_reaction(reaction.copy()) for reaction in result[0]]
                 # Flux will be evaluated here
-                new_value = model.optimize().objective_value
+                new_value = Model.optimize().objective_value
                 if new_value != None and new_value > value:
                     value = new_value
                 elif new_value == None:
                     continue
                 elif new_value != None and new_value == value:
                     break
+                elif new_value < value:
+                    if new_value >= value * value_fraction:
+                        for i in range(len(log)):
+                            Model.reactions.log[i][0].lower_bound = 0.
+                            Model.reactions.log[i][0].upper_bound = 0.
+                        new_value = Model.optimize().objective_value
+                        value = new_value
+                    else:
+                        [Model.remove_reactions(Model.reactions.log[i][0]) for i in range(len(log))]
+                        del added_reactions[str(template)]
+                        break
             except RuntimeError:
                 print("\n" + str(template) + ": failed to validate gapfilled model, try lowering the integer_threshold")
             except exceptions.Infeasible:
                 print("\n" + str(template) + ": gapfilling optimization failed (infeasible)")
-        return model, added_reactions
+        return Model, added_reactions
     else:
-        for template in templates:
+        for template in Templates:
             # adding exchange reactions
             if force_exchange == True:
-                add_exchange_reactions(model, template)
+                add_exchange_reactions(Model, template)
             # adding transport reactions
             if force_transport == True:
-                add_transport(model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
+                add_transport(Model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
             template.solver = 'gurobi'
             try:
-                result = gapfilling(model, template, integer_threshold = integer_threshold)
                 log = []
+                result = gapfilling(Model, template, integer_threshold = integer_threshold)   
                 for reaction in result[0]:
                     if reaction.id.startswith("EX_"):
                         log.append((reaction.id, "Exchange reaction"))
@@ -246,9 +266,9 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
                         log.append((reaction.id, [str(list(reaction.genes)[i]) 
                                               for i in range(len(list(reaction.genes)))]))
                 added_reactions[str(template)] = log
-                [model.add_reaction(reaction.copy()) for reaction in result[0]]
+                [Model.add_reaction(reaction.copy()) for reaction in result[0]]
             except RuntimeError:
                 print("\n" + str(template) + ": failed to validate gapfilled model, try lowering the integer_threshold")
             except exceptions.Infeasible:
                 print("\n" + str(template) + ": gapfilling optimization failed (infeasible)") 
-        return model, added_reactions
+        return Model, added_reactions
