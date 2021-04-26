@@ -1,6 +1,7 @@
 import cobra
 import re
 from cobra.flux_analysis.gapfilling import GapFiller
+from cobra.io import read_sbml_model, write_sbml_model
 import gurobipy
 from cobra import exceptions
 import os, sys
@@ -242,6 +243,9 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
                         [Model.remove_reactions(Model.reactions.log[i][0]) for i in range(len(log))]
                         del added_reactions[str(template)]
                         break
+                write_sbml_model(Model, filename = "model.tmp")
+                Model = read_sbml_model("model.tmp")
+                os.remove("model.tmp")
             except RuntimeError:
                 print("\n" + str(template) + ": failed to validate gapfilled model, try lowering the integer_threshold")
             except exceptions.Infeasible:
@@ -267,6 +271,9 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
                                               for i in range(len(list(reaction.genes)))]))
                 added_reactions[str(template)] = log
                 [Model.add_reaction(reaction.copy()) for reaction in result[0]]
+                write_sbml_model(Model, filename = "model.tmp")
+                Model = read_sbml_model("model.tmp")
+                os.remove("model.tmp")
             except RuntimeError:
                 print("\n" + str(template) + ": failed to validate gapfilled model, try lowering the integer_threshold")
             except exceptions.Infeasible:
