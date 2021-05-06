@@ -127,12 +127,12 @@ def seed_to_bigg(model, m_table, r_table):
         new_model.add_reaction(r)
     return new_model
 
-def modelseed(id_list, gapfilling = True, tobigg = True, M_table, R_table):
+def modelseed(id_list, M_table, R_table, gapfilling = True, tobigg = True):
     """
     Function containing the three above.
     """
     # models is a dict
-    models = get_models(ID_list = ID_list)
+    models = get_models(ID_list = id_list)
     if gapfilling == True:
         modelseed_gapfilling(models)
     if tobigg == True:
