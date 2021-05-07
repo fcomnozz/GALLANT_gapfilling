@@ -19,7 +19,7 @@ def load_query_model(model, obj = None):
     Print is used temporary. A general log will be generated in the 
     final version.
     """
-    Model = fake_copy(model)
+    Model = model
     if obj == "biomass":
         b = re.compile("biomass", re.IGNORECASE)
         bc = re.compile("(biomass){1}.*(core){1}", re.IGNORECASE)
@@ -51,9 +51,7 @@ def load_template_models(template_list, obj = None):
     Takes a list of template models and changes objective if specified.
     Objective can be either "biomass" or a specific reaction ID.
     """
-    templates = []
-    for t in template_list:
-        templates.append(fake_copy(t))
+    templates = template_list
     failures = []
     if obj == None:
         return templates
@@ -194,7 +192,7 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
     """
     Model = load_query_model(model, obj = model_obj)
     Model.solver = 'gurobi'
-    Templates = load_template_models(templates, obj = template_obj)
+    Templates = load_template_models(template_list = templates, obj = template_obj)
     # this dict will store used models, genes and reactions
     added_reactions = {}
     # initial flux value
