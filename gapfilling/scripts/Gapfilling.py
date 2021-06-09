@@ -113,8 +113,8 @@ def is_transport(reaction, compartments_list, all_compounds = False, ignore_h = 
     r = list(str(x) for x in reaction.reactants)
     # right part
     p = list(str(x) for x in reaction.products)
-    if len(r) != len(p):
-        return False
+    #if len(r) != len(p):
+    #   return False
     c = compartments_list
     # removing terminations
     R = []
