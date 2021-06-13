@@ -97,10 +97,12 @@ def add_exchange_reactions(model, template):
     Adds all exchange reactions from a template matching model metabolites. 
     """
     EX = [template.reactions.get_by_id(i.id) for i in template.reactions if i.id.startswith("EX_")]
+    added_exchange = []
     for reaction in EX:
         if reaction not in model.reactions and str(list(reaction.metabolites.keys())[0]) in [i.id for i in model.metabolites]:
             model.add_reaction(reaction.copy())
-    return model
+            added_exchange.append(reaction.id)
+    return model, added_exchange
 
 def is_transport(reaction, compartments_list, all_compounds = False, ignore_h = False):
     """
@@ -151,6 +153,8 @@ def add_transport(model, template, all_compounds = False, ignore_h = False):
     Adds transport reactions from a template which metabolites are present in the model.
     """
     # PREPARATION
+    # added transport reactions register
+    added_transport = []
     # template compartments
     t_compartments = list(template.compartments.keys())
     t_Compartments = []
@@ -180,9 +184,10 @@ def add_transport(model, template, all_compounds = False, ignore_h = False):
                 for e in t_Compartments:
                     i = i.replace(e, "")
                 M.append(i)
-            if all(x in m_Metabolites for x in M):  
+            if all(x in m_Metabolites for x in M):
                 model.add_reaction(reaction.copy())
-    return model
+                added_transport.append((reaction.id, [str(list(reaction.genes)[i]) for i in range(len(list(reaction.genes)))]))
+    return model, added_transport
 
 def homology_gapfilling(model, templates, model_obj = None, template_obj = None, use_all_templates = False,
                        integer_threshold = 1e-6, force_exchange = False, force_transport = False, t_all_compounds = False,
@@ -201,16 +206,20 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
         value = 0.0
     if use_all_templates == False:
         for template in Templates:
+            # reactions "log"
+            log = []
             # adding exchange reactions
             if force_exchange == True:
-                add_exchange_reactions(Model, template)
+                Model, added_exchange = add_exchange_reactions(Model, template)
+                for reaction in added_exchange:
+                    log.append((reaction, "Exchange reaction"))
             # adding transport reactions
-            if force_transport == True:
-                add_transport(Model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
+            if force_transport == True:  
+                Model, added_transport = add_transport(Model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
+                for reaction in added_transport:
+                    log.append(reaction)
             template.solver = 'gurobi'
             try:
-                # reactions "log"
-                log = []
                 # result variable will store the reactions ids
                 result = gapfilling(Model, template, integer_threshold = integer_threshold)
                 for reaction in result[0]:
@@ -251,15 +260,19 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
         return Model, added_reactions
     else:
         for template in Templates:
+            log = []
             # adding exchange reactions
             if force_exchange == True:
-                add_exchange_reactions(Model, template)
+                Model, added_exchange = add_exchange_reactions(Model, template)
+                for reaction in added_exchange:
+                    log.append((reaction, "Exchange reaction"))
             # adding transport reactions
             if force_transport == True:
-                add_transport(Model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
+                Model, added_transport = add_transport(Model, template, all_compounds = t_all_compounds, ignore_h = t_ignore_h)
+                for reaction in added_transport:
+                    log.append(reaction)
             template.solver = 'gurobi'
             try:
-                log = []
                 result = gapfilling(Model, template, integer_threshold = integer_threshold)   
                 for reaction in result[0]:
                     if reaction.id.startswith("EX_"):
