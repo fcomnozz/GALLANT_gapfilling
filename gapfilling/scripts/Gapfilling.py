@@ -242,8 +242,8 @@ def homology_gapfilling(model, templates, model_obj = None, template_obj = None,
                 elif new_value < value:
                     if new_value >= value * value_fraction:
                         for i in range(len(log)):
-                            Model.reactions.log[i][0].lower_bound = 0.
-                            Model.reactions.log[i][0].upper_bound = 0.
+                            Model.reactions.get_by_id(log[i][0]).lower_bound = 0.
+                            Model.reactions.get_by_id(log[i][0]).upper_bound = 0.
                         new_value = Model.optimize().objective_value
                         value = new_value
                     else:
