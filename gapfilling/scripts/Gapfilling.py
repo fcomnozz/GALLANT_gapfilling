@@ -186,7 +186,7 @@ def add_transport(model, template, all_compounds = False, ignore_h = False):
                 M.append(i)
             if all(x in m_Metabolites for x in M):
                 model.add_reaction(reaction.copy())
-                added_transport.append((reaction.id, [str(list(reaction.genes)[i]) for i in range(len(list(reaction.genes)))]))
+                added_transport.append(('Transport reaction: ' + str(reaction.id), [str(list(reaction.genes)[i]) for i in range(len(list(reaction.genes)))]))
     return model, added_transport
 
 def homology_gapfilling(model, templates, model_obj = None, template_obj = None, use_all_templates = False,
