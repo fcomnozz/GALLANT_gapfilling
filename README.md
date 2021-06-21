@@ -1,4 +1,4 @@
-# Plastic_degradation_gap_filling
+# GALLANT_gapfilling
 Repository for the development of a gap filling module for Gallant. 
 This module contains two differentiated submoduleds:
 1) Homology gap filling: it takes a query SBML model and a list of sorted templates (SBML too), and performs gap filling based on COBRA algorithm. 
